@@ -92,6 +92,35 @@ export const DashboardPage: FC = () => {
           padding: 40px 20px;
           color: #999;
         }
+        .stats-grid {
+          display: flex;
+          flex-direction: column;
+          gap: 20px;
+        }
+        .forum-stats-row {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+        .forum-stats-header {
+          font-size: 16px;
+          font-weight: 600;
+          color: #333;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .forum-stats-cards {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+          gap: 16px;
+        }
+        .stats-empty {
+          text-align: center;
+          padding: 60px 20px;
+          color: #999;
+        }
+
         .stat-card {
           background: white;
           padding: 24px;
@@ -234,7 +263,6 @@ export const DashboardPage: FC = () => {
           }
           
           .stats-grid {
-            grid-template-columns: 1fr 1fr !important;
             gap: 16px !important;
           }
         }
@@ -319,13 +347,22 @@ export const DashboardPage: FC = () => {
              padding: 4px 8px !important;
            }
            
-           .stats-grid {
-             gap: 12px !important;
-           }
-           
-           .stat-card {
-             padding: 16px !important;
-           }
+          .stats-grid {
+            gap: 16px !important;
+          }
+
+          .forum-stats-header {
+            font-size: 14px !important;
+          }
+
+          .forum-stats-cards {
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)) !important;
+            gap: 12px !important;
+          }
+
+          .stat-card {
+            padding: 16px !important;
+          }
            
            .stat-card h3 {
              font-size: 12px !important;
@@ -687,8 +724,8 @@ export const DashboardPage: FC = () => {
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;" class="section-header">
                 <h2 style="font-size: 20px; color: #333; margin: 0;">📊 统计信息</h2>
               </div>
-              <div id="statsContent" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; min-height: 300px;" class="stats-grid">
-                <div style="text-align: center; padding: 60px 20px; color: #999; grid-column: 1 / -1;">
+              <div id="statsContent" style="display: flex; flex-direction: column; gap: 20px; min-height: 300px;" class="stats-grid">
+                <div class="stats-empty">
                   加载中...
                 </div>
               </div>

@@ -1203,28 +1203,35 @@ function renderStats(stats) {
 
     if (!stats || !stats.forums) {
         container.innerHTML = `
-            <div style="text-align: center; padding: 60px 20px; color: #999; grid-column: 1 / -1;">
+            <div class="stats-empty">
                 暂无统计数据
             </div>
         `;
         return;
     }
 
-    const cards = forums.flatMap(forum =>
-        metrics.map(metric => {
-            const forumStats = stats.forums[forum.key] || {};
+    const rows = forums.map(forum => {
+        const forumStats = stats.forums[forum.key] || {};
+        const cards = metrics.map(metric => {
             const value = forumStats[metric.key] ?? 0;
 
             return `
                 <div class="stat-card">
-                    <h3>${forum.label} ${metric.label}</h3>
+                    <h3>${metric.label}</h3>
                     <div class="number">${value}</div>
                 </div>
             `;
-        })
-    );
+        }).join('');
 
-    container.innerHTML = cards.join('');
+        return `
+            <div class="forum-stats-row">
+                <div class="forum-stats-header">${forum.label}</div>
+                <div class="forum-stats-cards">${cards}</div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = rows.join('');
 }
 
 // 刷新 Bot 信息
