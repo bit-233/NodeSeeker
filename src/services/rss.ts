@@ -30,12 +30,6 @@ interface RSSSource {
   domain: string;
 }
 
-interface RSSSource {
-  name: string;
-  url: string;
-  referer?: string;
-}
-
 export class RSSService {
   private readonly RSS_SOURCES: RSSSource[] = [
     {
@@ -305,6 +299,27 @@ export class RSSService {
       // 第二步：批量查询已存在的文章
       const existingPosts = await this.dbService.getPostsByPostIds(postIds);
       console.log(`批量查询完成: 找到 ${existingPosts.size} 个已存在的文章`);
+
+      // 更新已存在文章的域名信息，防止旧数据仍指向 NodeSeek
+      const domainUpdates: Array<{ postId: number; sourceDomain: string }> = [];
+      for (const parsedPost of parsedPosts) {
+        const existingPost = existingPosts.get(parsedPost.post_id);
+        if (!existingPost) continue;
+
+        const parsedDomain = parsedPost.source_domain || 'www.nodeseek.com';
+        if (existingPost.source_domain !== parsedDomain) {
+          domainUpdates.push({
+            postId: parsedPost.post_id,
+            sourceDomain: parsedDomain
+          });
+          existingPost.source_domain = parsedDomain;
+        }
+      }
+
+      if (domainUpdates.length > 0) {
+        await this.dbService.batchUpdatePostSourceDomain(domainUpdates);
+        console.log(`已修正 ${domainUpdates.length} 篇文章的域名指向`);
+      }
 
       // 第三步：筛选出需要创建的新文章
       const newPostsToCreate = parsedPosts.filter(parsedPost => {

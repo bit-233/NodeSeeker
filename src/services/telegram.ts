@@ -53,6 +53,7 @@ export class TelegramService {
    */
   private getCategoryIcon(category: string): string {
     const categoryMap: { [key: string]: string } = {
+      'ai': '🤖',
       'daily': '📅',
       'tech': '💻',
       'info': 'ℹ️',
@@ -64,25 +65,44 @@ export class TelegramService {
       'dev': '⚡',
       'photo': '📷',
       'expose': '🚨',
-      'sandbox': '🏖️'
+      'sandbox': '🏖️',
+      'emotion': '💞',
+      'stream': '🎬',
+      'sports': '🏅',
+      'game': '🎮',
+      'coupon': '🎁',
+      'financial': '📈',
+      'device': '📱',
+      'feedback': '🛠️',
+      'inside': '🔒'
     };
     return categoryMap[category] || '📂';
   }
 
   private getCategoryName(category: string): string {
     const categoryMap: { [key: string]: string } = {
-      'daily': '日常',
+      'ai': '人工智能',
+      'daily': '日常 / 摸鱼闲聊',
       'tech': '技术',
       'info': '情报',
       'review': '测评',
       'trade': '交易',
       'carpool': '拼车',
-      'promotion': '推广',
+      'promotion': '推广 / 服务推广',
       'life': '生活',
       'dev': 'Dev',
       'photo': '贴图',
       'expose': '曝光',
-      'sandbox': '沙盒'
+      'sandbox': '沙盒 / 沙盒测试',
+      'emotion': '情感八卦',
+      'stream': '影音图文',
+      'sports': '运动赛事',
+      'game': '游戏同好',
+      'coupon': '羊毛福利',
+      'financial': '投资理财',
+      'device': '电子设备',
+      'feedback': '运营反馈',
+      'inside': '内部版块'
     };
     return categoryMap[category] || category;
   }

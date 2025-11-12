@@ -79,6 +79,20 @@ export class DatabaseService {
             .run();
         }
 
+        // 迁移已存在的深水区文章域名信息
+        const migrateResult = await this.db
+          .prepare(`
+            UPDATE posts
+            SET source_domain = 'www.deepflood.com'
+            WHERE source_domain = 'www.nodeseek.com'
+              AND category IN ('ai', 'emotion', 'stream', 'sports', 'game', 'coupon', 'financial', 'device', 'feedback', 'inside')
+          `)
+          .run();
+
+        if ((migrateResult.meta?.changes || 0) > 0) {
+          this.clearCacheByPattern('posts');
+        }
+
         this.postsSchemaEnsured = true;
       } catch (error) {
         console.error('确保 posts 表结构失败:', error);
@@ -555,7 +569,7 @@ export class DatabaseService {
     pushDate?: string;
   }>): Promise<void> {
     if (updates.length === 0) return;
-    
+
     // 使用事务进行批量更新
     const statements = updates.map(update => ({
       sql: `
@@ -571,9 +585,28 @@ export class DatabaseService {
       ]
     }));
     
-    await this.db.batch(statements.map(stmt => 
+    await this.db.batch(statements.map(stmt =>
       this.db.prepare(stmt.sql).bind(...stmt.params)
     ));
+
+    this.clearCacheByPattern('posts');
+  }
+
+  async batchUpdatePostSourceDomain(updates: Array<{
+    postId: number;
+    sourceDomain: string;
+  }>): Promise<void> {
+    if (updates.length === 0) return;
+
+    const statements = updates.map(update =>
+      this.db.prepare(
+        `UPDATE posts SET source_domain = ? WHERE post_id = ?`
+      ).bind(update.sourceDomain, update.postId)
+    );
+
+    await this.db.batch(statements);
+
+    this.clearCacheByPattern('posts');
   }
 
   // 关键词订阅相关操作
