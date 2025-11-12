@@ -30,6 +30,12 @@ interface RSSSource {
   domain: string;
 }
 
+interface RSSSource {
+  name: string;
+  url: string;
+  referer?: string;
+}
+
 export class RSSService {
   private readonly RSS_SOURCES: RSSSource[] = [
     {
