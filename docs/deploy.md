@@ -19,7 +19,7 @@ pnpm install
 
 ```bash
 # 创建数据库
-npx wrangler d1 create nodeseeker-db
+npx wrangler d1 create nodeseek-deepflooder
 
 # 记录返回的 database_id，更新 wrangler.jsonc 中的 database_id
 ```
@@ -33,7 +33,7 @@ npx wrangler d1 create nodeseeker-db
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "nodeseeker-db",
+      "database_name": "nodeseek-deepflooder",
       "database_id": "你的实际数据库ID"
     }
   ]
@@ -44,7 +44,7 @@ npx wrangler d1 create nodeseeker-db
 
 ```bash
 # 执行数据库迁移
-npx wrangler d1 execute nodeseeker-db --file=./migrations/0001_initial.sql
+npx wrangler d1 execute nodeseek-deepflooder --file=./migrations/0001_initial.sql
 ```
 
 ### 5. 本地开发测试
@@ -121,7 +121,7 @@ pnpm deploy
 
 ```bash
 # 测试数据库连接
-npx wrangler d1 execute nodeseeker-db --command="SELECT 1"
+npx wrangler d1 execute nodeseek-deepflooder --command="SELECT 1"
 ```
 
 ### 2. Telegram Bot 问题
@@ -154,13 +154,13 @@ npx wrangler tail
 
 ```bash
 # 查看配置
-npx wrangler d1 execute nodeseeker-db --command="SELECT * FROM base_config"
+npx wrangler d1 execute nodeseek-deepflooder --command="SELECT * FROM base_config"
 
 # 查看最近文章
-npx wrangler d1 execute nodeseeker-db --command="SELECT * FROM posts ORDER BY created_at DESC LIMIT 10"
+npx wrangler d1 execute nodeseek-deepflooder --command="SELECT * FROM posts ORDER BY created_at DESC LIMIT 10"
 
 # 查看订阅
-npx wrangler d1 execute nodeseeker-db --command="SELECT * FROM keywords_sub"
+npx wrangler d1 execute nodeseek-deepflooder --command="SELECT * FROM keywords_sub"
 ```
 
 ## 安全建议
@@ -196,7 +196,7 @@ pnpm deploy
 如果有新的数据库迁移文件：
 
 ```bash
-npx wrangler d1 execute nodeseeker-db --file=./migrations/新的迁移文件.sql
+npx wrangler d1 execute nodeseek-deepflooder --file=./migrations/新的迁移文件.sql
 ```
 
 ## 技术支持
