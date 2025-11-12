@@ -24,7 +24,15 @@ export interface Post {
   pub_date: string;
   push_date?: string;
   created_at?: string;
+  source_domain: string;
 }
+
+export type ForumKey = 'nodeseek' | 'deepflood';
+
+const FORUM_DOMAINS: Record<ForumKey, string> = {
+  nodeseek: 'www.nodeseek.com',
+  deepflood: 'www.deepflood.com'
+};
 
 export interface KeywordSub {
   id?: number;
@@ -33,6 +41,7 @@ export interface KeywordSub {
   keyword3?: string;
   creator?: string;
   category?: string;
+  forum?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -40,9 +49,123 @@ export interface KeywordSub {
 export class DatabaseService {
   private queryCache: Map<string, { data: any; timestamp: number; ttl: number }>;
   private readonly CACHE_TTL = 60000; // 1分钟缓存
+  private postsSchemaEnsured = false;
+  private postsSchemaPromise: Promise<void> | null = null;
+  private keywordSubSchemaEnsured = false;
+  private keywordSubSchemaPromise: Promise<void> | null = null;
 
   constructor(private db: D1Database) {
     this.queryCache = new Map();
+  }
+
+  private getForumDomain(forum: ForumKey): string {
+    return FORUM_DOMAINS[forum];
+  }
+
+  private getForumCacheKey(method: string, forum: ForumKey): string {
+    return this.getCacheKey(`ForumStats:${method}`, [forum]);
+  }
+
+  private async ensurePostsTableSchema(): Promise<void> {
+    if (this.postsSchemaEnsured) {
+      return;
+    }
+
+    if (this.postsSchemaPromise) {
+      await this.postsSchemaPromise;
+      return;
+    }
+
+    this.postsSchemaPromise = (async () => {
+      try {
+        const tableResult = await this.db
+          .prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`)
+          .bind('posts')
+          .first();
+
+        if (!tableResult) {
+          return;
+        }
+
+        const columnsResult = await this.db.prepare('PRAGMA table_info(posts)').all();
+        const columns = (columnsResult.results as Array<{ name: string }> | undefined) || [];
+        const hasSourceDomain = columns.some(column => column.name === 'source_domain');
+
+        if (!hasSourceDomain) {
+          await this.db
+            .prepare(`ALTER TABLE posts ADD COLUMN source_domain TEXT NOT NULL DEFAULT 'www.nodeseek.com'`)
+            .run();
+        }
+
+        // 迁移已存在的深水区文章域名信息
+        const migrateResult = await this.db
+          .prepare(`
+            UPDATE posts
+            SET source_domain = 'www.deepflood.com'
+            WHERE source_domain = 'www.nodeseek.com'
+              AND category IN ('ai', 'emotion', 'stream', 'sports', 'game', 'coupon', 'financial', 'device', 'feedback', 'inside')
+          `)
+          .run();
+
+        if ((migrateResult.meta?.changes || 0) > 0) {
+          this.clearCacheByPattern('posts');
+        }
+
+        this.postsSchemaEnsured = true;
+      } catch (error) {
+        console.error('确保 posts 表结构失败:', error);
+        throw error;
+      } finally {
+        this.postsSchemaPromise = null;
+      }
+    })();
+
+    await this.postsSchemaPromise;
+  }
+
+  private async ensureKeywordSubTableSchema(): Promise<void> {
+    if (this.keywordSubSchemaEnsured) {
+      return;
+    }
+
+    if (this.keywordSubSchemaPromise) {
+      await this.keywordSubSchemaPromise;
+      return;
+    }
+
+    this.keywordSubSchemaPromise = (async () => {
+      try {
+        const tableResult = await this.db
+          .prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`)
+          .bind('keywords_sub')
+          .first();
+
+        if (!tableResult) {
+          return;
+        }
+
+        const columnsResult = await this.db.prepare('PRAGMA table_info(keywords_sub)').all();
+        const columns = (columnsResult.results as Array<{ name: string }> | undefined) || [];
+        const hasForumColumn = columns.some(column => column.name === 'forum');
+
+        if (!hasForumColumn) {
+          await this.db
+            .prepare(`ALTER TABLE keywords_sub ADD COLUMN forum TEXT NOT NULL DEFAULT 'all'`)
+            .run();
+          this.clearCacheByPattern('KeywordSubs');
+          this.clearCacheByPattern('Subscriptions');
+        }
+
+        this.keywordSubSchemaEnsured = true;
+      } catch (error) {
+        console.error('确保 keywords_sub 表结构失败:', error);
+        throw error;
+      } finally {
+        this.keywordSubSchemaPromise = null;
+      }
+    })();
+
+    await this.keywordSubSchemaPromise;
   }
 
   // 缓存助手方法
@@ -109,7 +232,8 @@ export class DatabaseService {
       // 检查表是否已存在，如果存在则跳过初始化
       const tablesExist = await this.checkTablesExist();
       if (tablesExist) {
-        console.log('数据库表已存在，跳过初始化');
+        console.log('数据库表已存在，检查结构更新');
+        await this.ensurePostsTableSchema();
         return;
       }
 
@@ -145,9 +269,12 @@ export class DatabaseService {
           sub_id INTEGER DEFAULT NULL,
           pub_date DATETIME NOT NULL,
           push_date DATETIME DEFAULT NULL,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          source_domain TEXT NOT NULL DEFAULT 'www.nodeseek.com'
         )
       `).run();
+
+      this.postsSchemaEnsured = true;
 
       // 创建文章表的索引
       await this.db.prepare(`
@@ -188,6 +315,7 @@ export class DatabaseService {
           keyword3 TEXT DEFAULT NULL,
           creator TEXT NULL,
           category TEXT NULL,
+          forum TEXT NOT NULL DEFAULT 'all',
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
@@ -200,6 +328,10 @@ export class DatabaseService {
 
       await this.db.prepare(`
         CREATE INDEX IF NOT EXISTS idx_keywords_sub_category ON keywords_sub(category)
+      `).run();
+
+      await this.db.prepare(`
+        CREATE INDEX IF NOT EXISTS idx_keywords_sub_forum ON keywords_sub(forum)
       `).run();
 
       await this.db.prepare(`
@@ -307,9 +439,11 @@ export class DatabaseService {
 
   // 文章相关操作
   async createPost(post: Omit<Post, 'id' | 'created_at'>): Promise<Post> {
+    await this.ensurePostsTableSchema();
+
     const result = await this.db.prepare(`
-      INSERT INTO posts (post_id, title, memo, category, creator, push_status, sub_id, pub_date, push_date)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO posts (post_id, title, memo, category, creator, push_status, sub_id, pub_date, push_date, source_domain)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       RETURNING *
     `).bind(
       post.post_id,
@@ -320,7 +454,8 @@ export class DatabaseService {
       post.push_status,
       post.sub_id || null,
       post.pub_date,
-      post.push_date || null
+      post.push_date || null,
+      post.source_domain
     ).first();
 
     // 清除相关缓存
@@ -338,11 +473,13 @@ export class DatabaseService {
       return 0;
     }
 
+    await this.ensurePostsTableSchema();
+
     // 使用事务进行批量插入
-    const statements = posts.map(post => 
+    const statements = posts.map(post =>
       this.db.prepare(`
-        INSERT INTO posts (post_id, title, memo, category, creator, push_status, sub_id, pub_date, push_date)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO posts (post_id, title, memo, category, creator, push_status, sub_id, pub_date, push_date, source_domain)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
         post.post_id,
         post.title,
@@ -352,7 +489,8 @@ export class DatabaseService {
         post.push_status,
         post.sub_id || null,
         post.pub_date,
-        post.push_date || null
+        post.push_date || null,
+        post.source_domain
       )
     );
 
@@ -396,10 +534,13 @@ export class DatabaseService {
 
   async updatePostPushStatus(postId: number, pushStatus: number, subId?: number, pushDate?: string): Promise<void> {
     await this.db.prepare(`
-      UPDATE posts 
+      UPDATE posts
       SET push_status = ?, sub_id = ?, push_date = ?
       WHERE post_id = ?
     `).bind(pushStatus, subId || null, pushDate || null, postId).run();
+
+    this.clearCacheByPattern('posts');
+    this.clearCacheByPattern('Stats');
   }
 
   async getRecentPosts(limit: number = 10): Promise<Post[]> {
@@ -424,12 +565,13 @@ export class DatabaseService {
 
   // 新增：带分页的文章查询
   async getPostsWithPagination(
-    page: number = 1, 
-    limit: number = 30, 
+    page: number = 1,
+    limit: number = 30,
     filters?: {
       pushStatus?: number;
       creator?: string;
       category?: string;
+      forum?: string;
     }
   ): Promise<{
     posts: Post[];
@@ -460,6 +602,12 @@ export class DatabaseService {
       if (filters.category) {
         conditions.push('category LIKE ?');
         params.push(`%${filters.category}%`);
+      }
+
+      if (filters.forum) {
+        const domain = filters.forum === 'deepflood' ? 'www.deepflood.com' : 'www.nodeseek.com';
+        conditions.push('source_domain = ?');
+        params.push(domain);
       }
     }
     
@@ -499,7 +647,7 @@ export class DatabaseService {
     pushDate?: string;
   }>): Promise<void> {
     if (updates.length === 0) return;
-    
+
     // 使用事务进行批量更新
     const statements = updates.map(update => ({
       sql: `
@@ -515,33 +663,61 @@ export class DatabaseService {
       ]
     }));
     
-    await this.db.batch(statements.map(stmt => 
+    await this.db.batch(statements.map(stmt =>
       this.db.prepare(stmt.sql).bind(...stmt.params)
     ));
+
+    this.clearCacheByPattern('posts');
+    this.clearCacheByPattern('Stats');
+  }
+
+  async batchUpdatePostSourceDomain(updates: Array<{
+    postId: number;
+    sourceDomain: string;
+  }>): Promise<void> {
+    if (updates.length === 0) return;
+
+    const statements = updates.map(update =>
+      this.db.prepare(
+        `UPDATE posts SET source_domain = ? WHERE post_id = ?`
+      ).bind(update.sourceDomain, update.postId)
+    );
+
+    await this.db.batch(statements);
+
+    this.clearCacheByPattern('posts');
+    this.clearCacheByPattern('Stats');
   }
 
   // 关键词订阅相关操作
   async createKeywordSub(sub: Omit<KeywordSub, 'id' | 'created_at' | 'updated_at'>): Promise<KeywordSub> {
+    await this.ensureKeywordSubTableSchema();
+    const normalizedForum = sub.forum && ['nodeseek', 'deepflood', 'all'].includes(sub.forum)
+      ? sub.forum
+      : 'all';
     const result = await this.db.prepare(`
-      INSERT INTO keywords_sub (keyword1, keyword2, keyword3, creator, category)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO keywords_sub (keyword1, keyword2, keyword3, creator, category, forum)
+      VALUES (?, ?, ?, ?, ?, ?)
       RETURNING *
     `).bind(
       sub.keyword1 || null,
       sub.keyword2 || null,
       sub.keyword3 || null,
       sub.creator || null,
-      sub.category || null
+      sub.category || null,
+      normalizedForum
     ).first();
 
     // 清理相关缓存
     this.clearCacheByPattern('KeywordSubs');
     this.clearCacheByPattern('Subscriptions');
+    this.clearCacheByPattern('Stats');
 
     return result as unknown as KeywordSub;
   }
 
   async getAllKeywordSubs(): Promise<KeywordSub[]> {
+    await this.ensureKeywordSubTableSchema();
     const cacheKey = this.getCacheKey('getAllKeywordSubs', []);
     const cached = this.getFromCache<KeywordSub[]>(cacheKey);
     if (cached !== null) return cached;
@@ -555,16 +731,19 @@ export class DatabaseService {
   }
 
   async deleteKeywordSub(id: number): Promise<boolean> {
+    await this.ensureKeywordSubTableSchema();
     const result = await this.db.prepare('DELETE FROM keywords_sub WHERE id = ?').bind(id).run();
-    
+
     // 清理相关缓存
     this.clearCacheByPattern('KeywordSubs');
     this.clearCacheByPattern('Subscriptions');
-    
+    this.clearCacheByPattern('Stats');
+
     return result.meta.changes > 0;
   }
 
   async updateKeywordSub(id: number, sub: Partial<Omit<KeywordSub, 'id' | 'created_at' | 'updated_at'>>): Promise<KeywordSub | null> {
+    await this.ensureKeywordSubTableSchema();
     const updates: string[] = [];
     const values: any[] = [];
 
@@ -589,6 +768,14 @@ export class DatabaseService {
       values.push(sub.category || null);
     }
 
+    if (sub.forum !== undefined) {
+      const normalizedForum = ['nodeseek', 'deepflood', 'all'].includes(sub.forum)
+        ? sub.forum
+        : 'all';
+      updates.push('forum = ?');
+      values.push(normalizedForum);
+    }
+
     if (updates.length === 0) {
       return this.getKeywordSubById(id);
     }
@@ -597,16 +784,21 @@ export class DatabaseService {
     values.push(id);
 
     const result = await this.db.prepare(`
-      UPDATE keywords_sub 
+      UPDATE keywords_sub
       SET ${updates.join(', ')}
       WHERE id = ?
       RETURNING *
     `).bind(...values).first();
 
+    this.clearCacheByPattern('KeywordSubs');
+    this.clearCacheByPattern('Subscriptions');
+    this.clearCacheByPattern('Stats');
+
     return result as KeywordSub | null;
   }
 
   async getKeywordSubById(id: number): Promise<KeywordSub | null> {
+    await this.ensureKeywordSubTableSchema();
     const result = await this.db.prepare('SELECT * FROM keywords_sub WHERE id = ?').bind(id).first();
     return result as KeywordSub | null;
   }
@@ -663,6 +855,21 @@ export class DatabaseService {
     return count;
   }
 
+  async getSubscriptionsCountByForum(forum: ForumKey): Promise<number> {
+    await this.ensureKeywordSubTableSchema();
+    const cacheKey = this.getForumCacheKey('getSubscriptionsCount', forum);
+    const cached = this.getFromCache<number>(cacheKey);
+    if (cached !== null) return cached;
+
+    const result = await this.db.prepare(`
+      SELECT COUNT(*) as count FROM keywords_sub
+      WHERE forum = ? OR forum = 'all'
+    `).bind(forum).first();
+    const count = (result as any)?.count || 0;
+    this.setCache(cacheKey, count, 60000);
+    return count;
+  }
+
   async getTodayPostsCount(): Promise<number> {
     const cacheKey = this.getCacheKey('getTodayPostsCount', []);
     const cached = this.getFromCache<number>(cacheKey);
@@ -673,6 +880,52 @@ export class DatabaseService {
     `).first();
     const count = (result as any)?.count || 0;
     this.setCache(cacheKey, count, 60000); // 1分钟缓存
+    return count;
+  }
+
+  async getPostsCountByForum(forum: ForumKey): Promise<number> {
+    const cacheKey = this.getForumCacheKey('getPostsCount', forum);
+    const cached = this.getFromCache<number>(cacheKey);
+    if (cached !== null) return cached;
+
+    const result = await this.db.prepare(`
+      SELECT COUNT(*) as count FROM posts
+      WHERE created_at >= datetime('now', '-24 hours')
+        AND source_domain = ?
+    `).bind(this.getForumDomain(forum)).first();
+    const count = (result as any)?.count || 0;
+    this.setCache(cacheKey, count, 30000);
+    return count;
+  }
+
+  async getTodayPostsCountByForum(forum: ForumKey): Promise<number> {
+    const cacheKey = this.getForumCacheKey('getTodayPostsCount', forum);
+    const cached = this.getFromCache<number>(cacheKey);
+    if (cached !== null) return cached;
+
+    const result = await this.db.prepare(`
+      SELECT COUNT(*) as count FROM posts
+      WHERE created_at >= datetime('now', '-24 hours')
+        AND source_domain = ?
+    `).bind(this.getForumDomain(forum)).first();
+    const count = (result as any)?.count || 0;
+    this.setCache(cacheKey, count, 60000);
+    return count;
+  }
+
+  async getTodayMessagesCountByForum(forum: ForumKey): Promise<number> {
+    const cacheKey = this.getForumCacheKey('getTodayMessagesCount', forum);
+    const cached = this.getFromCache<number>(cacheKey);
+    if (cached !== null) return cached;
+
+    const result = await this.db.prepare(`
+      SELECT COUNT(*) as count FROM posts
+      WHERE push_status = 1
+        AND push_date >= datetime('now', '-24 hours')
+        AND source_domain = ?
+    `).bind(this.getForumDomain(forum)).first();
+    const count = (result as any)?.count || 0;
+    this.setCache(cacheKey, count, 60000);
     return count;
   }
 
@@ -719,6 +972,12 @@ export class DatabaseService {
     today_posts: number;
     today_messages: number;
     last_update: string | null;
+    forums: Record<ForumKey, {
+      subscriptions: number;
+      total_posts: number;
+      today_posts: number;
+      today_messages: number;
+    }>;
   }> {
     try {
       const [
@@ -741,6 +1000,53 @@ export class DatabaseService {
         this.getLastUpdateTime()
       ]);
 
+      const forumResults = await Promise.all(
+        (['nodeseek', 'deepflood'] as ForumKey[]).map(async forum => {
+          const [subscriptions, forumPosts, forumTodayPosts, forumTodayMessages] = await Promise.all([
+            this.getSubscriptionsCountByForum(forum),
+            this.getPostsCountByForum(forum),
+            this.getTodayPostsCountByForum(forum),
+            this.getTodayMessagesCountByForum(forum)
+          ]);
+
+          return {
+            forum,
+            stats: {
+              subscriptions,
+              total_posts: forumPosts,
+              today_posts: forumTodayPosts,
+              today_messages: forumTodayMessages
+            }
+          };
+        })
+      );
+
+      const forumsStats = forumResults.reduce(
+        (acc, { forum, stats }) => {
+          acc[forum] = stats;
+          return acc;
+        },
+        {
+          nodeseek: {
+            subscriptions: 0,
+            total_posts: 0,
+            today_posts: 0,
+            today_messages: 0
+          },
+          deepflood: {
+            subscriptions: 0,
+            total_posts: 0,
+            today_posts: 0,
+            today_messages: 0
+          }
+        } as Record<ForumKey, {
+          subscriptions: number;
+          total_posts: number;
+          today_posts: number;
+          today_messages: number;
+        }>
+      );
+
       return {
         total_posts: totalPosts,
         unpushed_posts: unpushedPosts,
@@ -749,7 +1055,8 @@ export class DatabaseService {
         total_subscriptions: totalSubscriptions,
         today_posts: todayPosts,
         today_messages: todayMessages,
-        last_update: lastUpdate
+        last_update: lastUpdate,
+        forums: forumsStats
       };
     } catch (error) {
       console.error('获取综合统计信息失败:', error);
@@ -761,7 +1068,21 @@ export class DatabaseService {
         total_subscriptions: 0,
         today_posts: 0,
         today_messages: 0,
-        last_update: null
+        last_update: null,
+        forums: {
+          nodeseek: {
+            subscriptions: 0,
+            total_posts: 0,
+            today_posts: 0,
+            today_messages: 0
+          },
+          deepflood: {
+            subscriptions: 0,
+            total_posts: 0,
+            today_posts: 0,
+            today_messages: 0
+          }
+        }
       };
     }
   }
@@ -799,9 +1120,10 @@ export class DatabaseService {
       this.clearCacheByPattern('posts');
       this.clearCacheByPattern('getPostsCount');
       this.clearCacheByPattern('getComprehensiveStats');
-      
+      this.clearCacheByPattern('Stats');
+
       console.log(`成功清理了 ${deletedCount} 条过期的post数据`);
-      
+
       return { deletedCount };
     } catch (error) {
       console.error('清理过期post数据失败:', error);
