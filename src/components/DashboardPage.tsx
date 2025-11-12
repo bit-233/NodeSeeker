@@ -92,6 +92,35 @@ export const DashboardPage: FC = () => {
           padding: 40px 20px;
           color: #999;
         }
+        .stats-grid {
+          display: flex;
+          flex-direction: column;
+          gap: 20px;
+        }
+        .forum-stats-row {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+        .forum-stats-header {
+          font-size: 16px;
+          font-weight: 600;
+          color: #333;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .forum-stats-cards {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+          gap: 16px;
+        }
+        .stats-empty {
+          text-align: center;
+          padding: 60px 20px;
+          color: #999;
+        }
+
         .stat-card {
           background: white;
           padding: 24px;
@@ -234,7 +263,6 @@ export const DashboardPage: FC = () => {
           }
           
           .stats-grid {
-            grid-template-columns: 1fr 1fr !important;
             gap: 16px !important;
           }
         }
@@ -319,13 +347,22 @@ export const DashboardPage: FC = () => {
              padding: 4px 8px !important;
            }
            
-           .stats-grid {
-             gap: 12px !important;
-           }
-           
-           .stat-card {
-             padding: 16px !important;
-           }
+          .stats-grid {
+            gap: 16px !important;
+          }
+
+          .forum-stats-header {
+            font-size: 14px !important;
+          }
+
+          .forum-stats-cards {
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)) !important;
+            gap: 12px !important;
+          }
+
+          .stat-card {
+            padding: 16px !important;
+          }
            
            .stat-card h3 {
              font-size: 12px !important;
@@ -573,21 +610,17 @@ export const DashboardPage: FC = () => {
                     <input type="text" id="creator" name="creator" placeholder="用户名" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" />
                   </div>
                   <div>
-                    <label for="category" style="display: block; margin-bottom: 6px; font-weight: 500; color: #333;">分类</label>
-                    <select id="category" name="category" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; background: white;">
-                      <option value="">全部</option>
-                      <option value="daily">📅 日常</option>
-                      <option value="tech">💻 技术</option>
-                      <option value="info">ℹ️ 情报</option>
-                      <option value="review">⭐ 测评</option>
-                      <option value="trade">💰 交易</option>
-                      <option value="carpool">🚗 拼车</option>
-                      <option value="promotion">📢 推广</option>
-                      <option value="life">🏠 生活</option>
-                      <option value="dev">⚡ Dev</option>
-                      <option value="photo">📷 贴图</option>
-                      <option value="expose">🚨 曝光</option>
-                      <option value="sandbox">🏖️ 沙盒</option>
+                    <label for="subForum" style="display: block; margin-bottom: 6px; font-weight: 500; color: #333;">论坛</label>
+                    <select id="subForum" name="forum" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; background: white;">
+                      <option value="all">全部论坛</option>
+                      <option value="nodeseek">NodeSeek</option>
+                      <option value="deepflood">DeepFlood</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label for="subCategory" style="display: block; margin-bottom: 6px; font-weight: 500; color: #333;">分类</label>
+                    <select id="subCategory" name="category" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; background: white;">
+                      <option value="">全部分类</option>
                     </select>
                   </div>
                 </div>
@@ -625,21 +658,17 @@ export const DashboardPage: FC = () => {
                 <h3 style="font-size: 16px; margin-bottom: 16px; color: #333;">🔍 筛选条件</h3>
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;" class="filter-grid">
                   <div>
+                    <label for="filterForum" style="display: block; margin-bottom: 6px; font-weight: 500; color: #333;">论坛</label>
+                    <select id="filterForum" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; background: white;">
+                      <option value="all">全部论坛</option>
+                      <option value="nodeseek">NodeSeek</option>
+                      <option value="deepflood">DeepFlood</option>
+                    </select>
+                  </div>
+                  <div>
                     <label for="filterCategory" style="display: block; margin-bottom: 6px; font-weight: 500; color: #333;">分类</label>
                     <select id="filterCategory" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; background: white;">
                       <option value="">全部分类</option>
-                      <option value="daily">📅 日常</option>
-                      <option value="tech">💻 技术</option>
-                      <option value="info">ℹ️ 情报</option>
-                      <option value="review">⭐ 测评</option>
-                      <option value="trade">💰 交易</option>
-                      <option value="carpool">🚗 拼车</option>
-                      <option value="promotion">📢 推广</option>
-                      <option value="life">🏠 生活</option>
-                      <option value="dev">⚡ Dev</option>
-                      <option value="photo">📷 贴图</option>
-                      <option value="expose">🚨 曝光</option>
-                      <option value="sandbox">🏖️ 沙盒</option>
                     </select>
                   </div>
                   
@@ -695,8 +724,8 @@ export const DashboardPage: FC = () => {
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;" class="section-header">
                 <h2 style="font-size: 20px; color: #333; margin: 0;">📊 统计信息</h2>
               </div>
-              <div id="statsContent" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; min-height: 300px;" class="stats-grid">
-                <div style="text-align: center; padding: 60px 20px; color: #999; grid-column: 1 / -1;">
+              <div id="statsContent" style="display: flex; flex-direction: column; gap: 20px; min-height: 300px;" class="stats-grid">
+                <div class="stats-empty">
                   加载中...
                 </div>
               </div>
