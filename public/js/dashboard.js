@@ -188,6 +188,31 @@ function setupForumCategoryControls() {
     }
 }
 
+const CATEGORY_CONFIG = {
+    'ai': { icon: '🤖', label: '人工智能' },
+    'daily': { icon: '📅', label: '日常 / 摸鱼闲聊' },
+    'emotion': { icon: '💞', label: '情感八卦' },
+    'stream': { icon: '🎬', label: '影音图文' },
+    'sports': { icon: '🏅', label: '运动赛事' },
+    'game': { icon: '🎮', label: '游戏同好' },
+    'coupon': { icon: '🎁', label: '羊毛福利' },
+    'promotion': { icon: '📢', label: '推广 / 服务推广' },
+    'financial': { icon: '📈', label: '投资理财' },
+    'device': { icon: '📱', label: '电子设备' },
+    'feedback': { icon: '🛠️', label: '运营反馈' },
+    'inside': { icon: '🔒', label: '内部版块' },
+    'sandbox': { icon: '🏖️', label: '沙盒 / 沙盒测试' },
+    'tech': { icon: '💻', label: '技术' },
+    'info': { icon: 'ℹ️', label: '情报' },
+    'review': { icon: '⭐', label: '测评' },
+    'trade': { icon: '💰', label: '交易' },
+    'carpool': { icon: '🚗', label: '拼车' },
+    'life': { icon: '🏠', label: '生活' },
+    'dev': { icon: '⚡', label: 'Dev' },
+    'photo': { icon: '📷', label: '贴图' },
+    'expose': { icon: '🚨', label: '曝光' }
+};
+
 document.addEventListener('DOMContentLoaded', function() {
     // 检查认证状态
     setupForumCategoryControls();
