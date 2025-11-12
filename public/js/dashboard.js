@@ -11,6 +11,31 @@ let isLoading = false;
 let hasMorePosts = true;
 let currentFilters = {};
 
+const CATEGORY_CONFIG = {
+    'ai': { icon: '🤖', label: '人工智能' },
+    'daily': { icon: '📅', label: '日常 / 摸鱼闲聊' },
+    'emotion': { icon: '💞', label: '情感八卦' },
+    'stream': { icon: '🎬', label: '影音图文' },
+    'sports': { icon: '🏅', label: '运动赛事' },
+    'game': { icon: '🎮', label: '游戏同好' },
+    'coupon': { icon: '🎁', label: '羊毛福利' },
+    'promotion': { icon: '📢', label: '推广 / 服务推广' },
+    'financial': { icon: '📈', label: '投资理财' },
+    'device': { icon: '📱', label: '电子设备' },
+    'feedback': { icon: '🛠️', label: '运营反馈' },
+    'inside': { icon: '🔒', label: '内部版块' },
+    'sandbox': { icon: '🏖️', label: '沙盒 / 沙盒测试' },
+    'tech': { icon: '💻', label: '技术' },
+    'info': { icon: 'ℹ️', label: '情报' },
+    'review': { icon: '⭐', label: '测评' },
+    'trade': { icon: '💰', label: '交易' },
+    'carpool': { icon: '🚗', label: '拼车' },
+    'life': { icon: '🏠', label: '生活' },
+    'dev': { icon: '⚡', label: 'Dev' },
+    'photo': { icon: '📷', label: '贴图' },
+    'expose': { icon: '🚨', label: '曝光' }
+};
+
 document.addEventListener('DOMContentLoaded', function() {
     // 检查认证状态
     checkAuth();
@@ -576,7 +601,7 @@ async function loadSubscriptions() {
 // 渲染订阅列表
 function renderSubscriptions(subscriptions) {
     const container = document.getElementById('subscriptionsList');
-    
+
     if (subscriptions.length === 0) {
         container.innerHTML = `
             <div class="empty-state">
@@ -586,27 +611,11 @@ function renderSubscriptions(subscriptions) {
         `;
         return;
     }
-    
-    // 分类映射表
-    const categoryMap = {
-        'daily': '📅 日常',
-        'tech': '💻 技术',
-        'info': 'ℹ️ 情报',
-        'review': '⭐ 测评',
-        'trade': '💰 交易',
-        'carpool': '🚗 拼车',
-        'promotion': '📢 推广',
-        'life': '🏠 生活',
-        'dev': '⚡ Dev',
-        'photo': '📷 贴图',
-        'expose': '🚨 曝光',
-        'sandbox': '🏖️ 沙盒'
-    };
-    
+
     container.innerHTML = subscriptions.map(sub => {
         const keywords = [sub.keyword1, sub.keyword2, sub.keyword3].filter(k => k);
         const hasKeywords = keywords.length > 0;
-        
+
         return `
             <div class="subscription-item">
                 <div class="subscription-header">
@@ -622,7 +631,7 @@ function renderSubscriptions(subscriptions) {
                 ` : ''}
                 <div class="filters">
                     ${sub.creator ? `<span>👤 创建者: ${sub.creator}</span>` : ''}
-                    ${sub.category ? `<span>📂 分类: ${categoryMap[sub.category] || sub.category}</span>` : ''}
+                    ${sub.category ? `<span>📂 分类: ${getCategoryName(sub.category)}</span>` : ''}
                     ${!hasKeywords && !sub.creator && !sub.category ? '<span style="color: #999;">无筛选条件</span>' : ''}
                 </div>
             </div>
@@ -789,11 +798,14 @@ function renderPosts(posts, reset = true) {
                 pushStatusColor = '#9e9e9e';
                 break;
         }
-        
+
+        const domain = post.source_domain || 'www.nodeseek.com';
+        const postUrl = `https://${domain}/post-${post.post_id}-1`;
+
         return `
             <div class="post-item">
                 <h4>
-                    <a href="https://www.nodeseek.com/post-${post.post_id}-1" target="_blank" rel="noopener noreferrer">
+                    <a href="${postUrl}" target="_blank" rel="noopener noreferrer">
                         ${post.title}
                     </a>
                 </h4>
@@ -817,21 +829,11 @@ function renderPosts(posts, reset = true) {
 
 // 获取分类显示名称
 function getCategoryName(category) {
-    const categoryMap = {
-        'daily': '📅 日常',
-        'tech': '💻 技术',
-        'info': 'ℹ️ 情报',
-        'review': '⭐ 测评',
-        'trade': '💰 交易',
-        'carpool': '🚗 拼车',
-        'promotion': '📢 推广',
-        'life': '🏠 生活',
-        'dev': '⚡ Dev',
-        'photo': '📷 贴图',
-        'expose': '🚨 曝光',
-        'sandbox': '🏖️ 沙盒'
-    };
-    return categoryMap[category] || category;
+    const config = CATEGORY_CONFIG[category];
+    if (!config) {
+        return category;
+    }
+    return `${config.icon} ${config.label}`;
 }
 
 // 更新文章信息显示

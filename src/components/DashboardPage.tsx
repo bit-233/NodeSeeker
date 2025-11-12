@@ -576,18 +576,28 @@ export const DashboardPage: FC = () => {
                     <label for="category" style="display: block; margin-bottom: 6px; font-weight: 500; color: #333;">分类</label>
                     <select id="category" name="category" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; background: white;">
                       <option value="">全部</option>
-                      <option value="daily">📅 日常</option>
+                      <option value="ai">🤖 人工智能</option>
+                      <option value="daily">📅 日常 / ☕ 摸鱼闲聊</option>
+                      <option value="emotion">💞 情感八卦</option>
+                      <option value="stream">🎬 影音图文</option>
+                      <option value="sports">🏅 运动赛事</option>
+                      <option value="game">🎮 游戏同好</option>
+                      <option value="coupon">🎁 羊毛福利</option>
+                      <option value="promotion">📢 推广 / 服务推广</option>
+                      <option value="financial">📈 投资理财</option>
+                      <option value="device">📱 电子设备</option>
+                      <option value="feedback">🛠️ 运营反馈</option>
+                      <option value="inside">🔒 内部版块</option>
+                      <option value="sandbox">🏖️ 沙盒 / 沙盒测试</option>
                       <option value="tech">💻 技术</option>
                       <option value="info">ℹ️ 情报</option>
                       <option value="review">⭐ 测评</option>
                       <option value="trade">💰 交易</option>
                       <option value="carpool">🚗 拼车</option>
-                      <option value="promotion">📢 推广</option>
                       <option value="life">🏠 生活</option>
                       <option value="dev">⚡ Dev</option>
                       <option value="photo">📷 贴图</option>
                       <option value="expose">🚨 曝光</option>
-                      <option value="sandbox">🏖️ 沙盒</option>
                     </select>
                   </div>
                 </div>
@@ -628,18 +638,28 @@ export const DashboardPage: FC = () => {
                     <label for="filterCategory" style="display: block; margin-bottom: 6px; font-weight: 500; color: #333;">分类</label>
                     <select id="filterCategory" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; background: white;">
                       <option value="">全部分类</option>
-                      <option value="daily">📅 日常</option>
+                      <option value="ai">🤖 人工智能</option>
+                      <option value="daily">📅 日常 / ☕ 摸鱼闲聊</option>
+                      <option value="emotion">💞 情感八卦</option>
+                      <option value="stream">🎬 影音图文</option>
+                      <option value="sports">🏅 运动赛事</option>
+                      <option value="game">🎮 游戏同好</option>
+                      <option value="coupon">🎁 羊毛福利</option>
+                      <option value="promotion">📢 推广 / 服务推广</option>
+                      <option value="financial">📈 投资理财</option>
+                      <option value="device">📱 电子设备</option>
+                      <option value="feedback">🛠️ 运营反馈</option>
+                      <option value="inside">🔒 内部版块</option>
+                      <option value="sandbox">🏖️ 沙盒 / 沙盒测试</option>
                       <option value="tech">💻 技术</option>
                       <option value="info">ℹ️ 情报</option>
                       <option value="review">⭐ 测评</option>
                       <option value="trade">💰 交易</option>
                       <option value="carpool">🚗 拼车</option>
-                      <option value="promotion">📢 推广</option>
                       <option value="life">🏠 生活</option>
                       <option value="dev">⚡ Dev</option>
                       <option value="photo">📷 贴图</option>
                       <option value="expose">🚨 曝光</option>
-                      <option value="sandbox">🏖️ 沙盒</option>
                     </select>
                   </div>
                   
