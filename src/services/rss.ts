@@ -20,10 +20,40 @@ export interface ParsedPost {
   pub_date: string;
 }
 
+interface RSSSource {
+  name: string;
+  url: string;
+  referer?: string;
+}
+
 export class RSSService {
-  private readonly RSS_URL = 'https://rss.nodeseek.com/';
+  private readonly RSS_SOURCES: RSSSource[] = [
+    {
+      name: 'NodeSeek',
+      url: 'https://rss.nodeseek.com/',
+      referer: 'https://www.nodeseek.com/'
+    },
+    {
+      name: 'DeepFlood',
+      url: 'https://feed.deepflood.com/topic.rss.xml',
+      referer: 'https://www.deepflood.com/'
+    }
+  ];
 
   constructor(private dbService: DatabaseService) {}
+
+  private buildRequestHeaders(referer?: string): HeadersInit {
+    return {
+      'User-Agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+      'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+      'Accept-Encoding': 'gzip, deflate, br',
+      ...(referer ? { Referer: referer } : {}),
+      'Cache-Control': 'no-cache',
+      Pragma: 'no-cache'
+    };
+  }
 
   /**
    * 从 XML 文本中提取标签内容
@@ -94,39 +124,50 @@ export class RSSService {
    * 抓取并解析 RSS 数据
    */
   async fetchAndParseRSS(): Promise<RSSItem[]> {
-    try {
-      console.log('开始抓取 RSS 数据...');
-      
-      const response = await fetch(this.RSS_URL, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-          'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-          'Accept-Encoding': 'gzip, deflate, br',
-          'Referer': 'https://www.nodeseek.com/',
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
+    const allItems: RSSItem[] = [];
+    const errors: string[] = [];
+    let successSources = 0;
+
+    for (const source of this.RSS_SOURCES) {
+      try {
+        console.log(`开始抓取 ${source.name} RSS 数据...`);
+
+        const response = await fetch(source.url, {
+          headers: this.buildRequestHeaders(source.referer)
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
-      })
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const xmlText = await response.text();
+        const items = this.parseRSSXML(xmlText);
+        successSources++;
+
+        if (!items || items.length === 0) {
+          console.log(`${source.name} RSS 数据为空`);
+          continue;
+        }
+
+        console.log(`成功抓取到 ${items.length} 条来自 ${source.name} 的 RSS 数据`);
+        allItems.push(...items);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error(`${source.name} RSS 抓取失败:`, error);
+        errors.push(`${source.name}: ${message}`);
       }
-
-      const xmlText = await response.text();
-      const items = this.parseRSSXML(xmlText);
-      
-      if (!items || items.length === 0) {
-        console.log('RSS 数据为空');
-        return [];
-      }
-
-      console.log(`成功抓取到 ${items.length} 条 RSS 数据`);
-      return items;
-    } catch (error) {
-      console.error('RSS 抓取失败:', error);
-      throw new Error(`RSS 抓取失败: ${error}`);
     }
+
+    if (successSources === 0) {
+      throw new Error(`RSS 抓取失败: ${errors.join('；')}`);
+    }
+
+    if (errors.length > 0) {
+      console.warn(`部分 RSS 源抓取失败: ${errors.join('；')}`);
+    }
+
+    console.log(`共收集到 ${allItems.length} 条 RSS 数据`);
+    return allItems;
   }
 
   /**
@@ -318,30 +359,34 @@ export class RSSService {
    * 验证 RSS 源是否可访问
    */
   async validateRSSSource(): Promise<{ accessible: boolean; message: string }> {
-    try {
-      const response = await fetch(this.RSS_URL, {
-        method: 'HEAD',
-        headers: {
-          'User-Agent': 'NodeSeeker RSS Bot 1.0'
-        }
-      });
+    const results = await Promise.all(
+      this.RSS_SOURCES.map(async source => {
+        try {
+          const response = await fetch(source.url, {
+            method: 'HEAD',
+            headers: {
+              'User-Agent': 'NodeSeeker RSS Bot 1.0',
+              ...(source.referer ? { Referer: source.referer } : {})
+            }
+          });
 
-      if (response.ok) {
-        return {
-          accessible: true,
-          message: 'RSS 源可正常访问'
-        };
-      } else {
-        return {
-          accessible: false,
-          message: `RSS 源访问失败: HTTP ${response.status}`
-        };
-      }
-    } catch (error) {
-      return {
-        accessible: false,
-        message: `RSS 源访问失败: ${error}`
-      };
-    }
+          if (response.ok) {
+            return `${source.name}: 可正常访问`;
+          }
+
+          return `${source.name}: HTTP ${response.status}`;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return `${source.name}: ${message}`;
+        }
+      })
+    );
+
+    const accessible = results.some(result => result.includes('可正常访问'));
+
+    return {
+      accessible,
+      message: results.join('；')
+    };
   }
 }
