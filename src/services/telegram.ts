@@ -87,6 +87,11 @@ export class TelegramService {
     return categoryMap[category] || category;
   }
 
+  private buildPostUrl(post: Post): string {
+    const domain = post.source_domain || 'www.nodeseek.com';
+    return `https://${domain}/post-${post.post_id}-1`;
+  }
+
   /**
    * 验证用户权限
    */
@@ -481,7 +486,8 @@ export class TelegramService {
 
     let text = '📰 最近10条文章\n\n';
     posts.forEach((post, index) => {
-      text += `${index + 1}. [${post.title}](https://www.nodeseek.com/post-${post.post_id}-1)\n`;
+      const postUrl = this.buildPostUrl(post);
+      text += `${index + 1}. [${post.title}](${postUrl})\n`;
     });
 
     await ctx.reply(text, { parse_mode: 'Markdown' });
@@ -609,7 +615,7 @@ ${userBindingStatus}
       const category = matchedSub.category ? `🗂️ ${this.getCategoryName(matchedSub.category)}` : '';
 
       // 构建帖子链接
-      const postUrl = `https://www.nodeseek.com/post-${post.post_id}-1`;
+      const postUrl = this.buildPostUrl(post);
 
       // 去除 post.title 会影响markdown链接的符号
       const title = post.title

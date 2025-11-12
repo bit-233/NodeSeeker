@@ -9,6 +9,8 @@ export interface RSSItem {
   contentSnippet: string;
   content: string;
   guid: string;
+  source: string;
+  source_domain: string;
 }
 
 export interface ParsedPost {
@@ -18,6 +20,14 @@ export interface ParsedPost {
   category: string;
   creator: string;
   pub_date: string;
+  source_domain: string;
+}
+
+interface RSSSource {
+  name: string;
+  url: string;
+  referer?: string;
+  domain: string;
 }
 
 interface RSSSource {
@@ -31,12 +41,14 @@ export class RSSService {
     {
       name: 'NodeSeek',
       url: 'https://rss.nodeseek.com/',
-      referer: 'https://www.nodeseek.com/'
+      referer: 'https://www.nodeseek.com/',
+      domain: 'www.nodeseek.com'
     },
     {
       name: 'DeepFlood',
       url: 'https://feed.deepflood.com/topic.rss.xml',
-      referer: 'https://www.deepflood.com/'
+      referer: 'https://www.deepflood.com/',
+      domain: 'www.deepflood.com'
     }
   ];
 
@@ -75,7 +87,7 @@ export class RSSService {
   /**
    * 解析 RSS XML 数据
    */
-  private parseRSSXML(xmlText: string): RSSItem[] {
+  private parseRSSXML(xmlText: string, source: RSSSource): RSSItem[] {
     try {
       // 提取所有 <item> 元素
       const itemRegex = /<item[^>]*>([\s\S]*?)<\/item>/gi;
@@ -109,7 +121,9 @@ export class RSSService {
           category,
           contentSnippet,
           content,
-          guid
+          guid,
+          source: source.name,
+          source_domain: source.domain
         });
       }
 
@@ -141,7 +155,7 @@ export class RSSService {
         }
 
         const xmlText = await response.text();
-        const items = this.parseRSSXML(xmlText);
+        const items = this.parseRSSXML(xmlText, source);
         successSources++;
 
         if (!items || items.length === 0) {
@@ -239,8 +253,19 @@ export class RSSService {
       memo,
       category,
       creator,
-      pub_date: pubDate
+      pub_date: pubDate,
+      source_domain: item.source_domain || this.extractDomainFromLink(item.link)
     };
+  }
+
+  private extractDomainFromLink(link: string): string {
+    try {
+      const url = new URL(link);
+      return url.hostname || 'www.nodeseek.com';
+    } catch (error) {
+      console.warn('无法从链接解析域名，使用默认值:', link, error);
+      return 'www.nodeseek.com';
+    }
   }
 
   /**
@@ -295,7 +320,8 @@ export class RSSService {
         try {
           const postsWithDefaults = newPostsToCreate.map(post => ({
             ...post,
-            push_status: 0 // 默认未推送
+            push_status: 0, // 默认未推送
+            source_domain: post.source_domain || 'www.nodeseek.com'
           }));
 
           const createdCount = await this.dbService.batchCreatePosts(postsWithDefaults);

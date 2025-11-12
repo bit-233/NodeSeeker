@@ -789,11 +789,14 @@ function renderPosts(posts, reset = true) {
                 pushStatusColor = '#9e9e9e';
                 break;
         }
-        
+
+        const domain = post.source_domain || 'www.nodeseek.com';
+        const postUrl = `https://${domain}/post-${post.post_id}-1`;
+
         return `
             <div class="post-item">
                 <h4>
-                    <a href="https://www.nodeseek.com/post-${post.post_id}-1" target="_blank" rel="noopener noreferrer">
+                    <a href="${postUrl}" target="_blank" rel="noopener noreferrer">
                         ${post.title}
                     </a>
                 </h4>

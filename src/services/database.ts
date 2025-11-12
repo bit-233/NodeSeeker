@@ -24,6 +24,7 @@ export interface Post {
   pub_date: string;
   push_date?: string;
   created_at?: string;
+  source_domain: string;
 }
 
 export interface KeywordSub {
@@ -40,9 +41,54 @@ export interface KeywordSub {
 export class DatabaseService {
   private queryCache: Map<string, { data: any; timestamp: number; ttl: number }>;
   private readonly CACHE_TTL = 60000; // 1分钟缓存
+  private postsSchemaEnsured = false;
+  private postsSchemaPromise: Promise<void> | null = null;
 
   constructor(private db: D1Database) {
     this.queryCache = new Map();
+  }
+
+  private async ensurePostsTableSchema(): Promise<void> {
+    if (this.postsSchemaEnsured) {
+      return;
+    }
+
+    if (this.postsSchemaPromise) {
+      await this.postsSchemaPromise;
+      return;
+    }
+
+    this.postsSchemaPromise = (async () => {
+      try {
+        const tableResult = await this.db
+          .prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`)
+          .bind('posts')
+          .first();
+
+        if (!tableResult) {
+          return;
+        }
+
+        const columnsResult = await this.db.prepare('PRAGMA table_info(posts)').all();
+        const columns = (columnsResult.results as Array<{ name: string }> | undefined) || [];
+        const hasSourceDomain = columns.some(column => column.name === 'source_domain');
+
+        if (!hasSourceDomain) {
+          await this.db
+            .prepare(`ALTER TABLE posts ADD COLUMN source_domain TEXT NOT NULL DEFAULT 'www.nodeseek.com'`)
+            .run();
+        }
+
+        this.postsSchemaEnsured = true;
+      } catch (error) {
+        console.error('确保 posts 表结构失败:', error);
+        throw error;
+      } finally {
+        this.postsSchemaPromise = null;
+      }
+    })();
+
+    await this.postsSchemaPromise;
   }
 
   // 缓存助手方法
@@ -109,7 +155,8 @@ export class DatabaseService {
       // 检查表是否已存在，如果存在则跳过初始化
       const tablesExist = await this.checkTablesExist();
       if (tablesExist) {
-        console.log('数据库表已存在，跳过初始化');
+        console.log('数据库表已存在，检查结构更新');
+        await this.ensurePostsTableSchema();
         return;
       }
 
@@ -145,9 +192,12 @@ export class DatabaseService {
           sub_id INTEGER DEFAULT NULL,
           pub_date DATETIME NOT NULL,
           push_date DATETIME DEFAULT NULL,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          source_domain TEXT NOT NULL DEFAULT 'www.nodeseek.com'
         )
       `).run();
+
+      this.postsSchemaEnsured = true;
 
       // 创建文章表的索引
       await this.db.prepare(`
@@ -307,9 +357,11 @@ export class DatabaseService {
 
   // 文章相关操作
   async createPost(post: Omit<Post, 'id' | 'created_at'>): Promise<Post> {
+    await this.ensurePostsTableSchema();
+
     const result = await this.db.prepare(`
-      INSERT INTO posts (post_id, title, memo, category, creator, push_status, sub_id, pub_date, push_date)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO posts (post_id, title, memo, category, creator, push_status, sub_id, pub_date, push_date, source_domain)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       RETURNING *
     `).bind(
       post.post_id,
@@ -320,7 +372,8 @@ export class DatabaseService {
       post.push_status,
       post.sub_id || null,
       post.pub_date,
-      post.push_date || null
+      post.push_date || null,
+      post.source_domain
     ).first();
 
     // 清除相关缓存
@@ -338,11 +391,13 @@ export class DatabaseService {
       return 0;
     }
 
+    await this.ensurePostsTableSchema();
+
     // 使用事务进行批量插入
-    const statements = posts.map(post => 
+    const statements = posts.map(post =>
       this.db.prepare(`
-        INSERT INTO posts (post_id, title, memo, category, creator, push_status, sub_id, pub_date, push_date)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO posts (post_id, title, memo, category, creator, push_status, sub_id, pub_date, push_date, source_domain)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
         post.post_id,
         post.title,
@@ -352,7 +407,8 @@ export class DatabaseService {
         post.push_status,
         post.sub_id || null,
         post.pub_date,
-        post.push_date || null
+        post.push_date || null,
+        post.source_domain
       )
     );
 
